@@ -136,12 +136,6 @@
             { emoji: '👻', word: '收工', anim: 'ghost-fade', gif: 'offwork.gif' },
         ];
 
-        // Prefetch all emote GIFs on page load
-        emotes.forEach(e => {
-            const img = new Image();
-            img.src = e.gif;
-        });
-
         // Show the first emote by default
         const gifContainer = document.getElementById('gifContainer');
         function renderGif(e, animate = false) {
