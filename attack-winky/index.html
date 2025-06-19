@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voice Emote Button</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <style>
+        @keyframes happy-bounce {
+
+            0%,
+            100% {
+                transform: translateY(0);
+            }
+
+            50% {
+                transform: translateY(-30px);
+            }
+        }
+
+        .happy-bounce {
+            animation: happy-bounce 0.7s cubic-bezier(.36, .07, .19, .97) infinite both;
+        }
+
+        @keyframes sad-droop {
+
+            0%,
+            100% {
+                transform: translateY(0);
+            }
+
+            50% {
+                transform: translateY(15px);
+                opacity: 0.7;
+            }
+        }
+
+        .sad-droop {
+            animation: sad-droop 1s ease-in-out infinite both;
+        }
+
+        @keyframes angry-shake {
+
+            0%,
+            100% {
+                transform: translateX(0);
+            }
+
+            20%,
+            60% {
+                transform: translateX(-15px);
+            }
+
+            40%,
+            80% {
+                transform: translateX(15px);
+            }
+        }
+
+        .angry-shake {
+            animation: angry-shake 0.5s cubic-bezier(.36, .07, .19, .97) infinite both;
+        }
+
+        @keyframes playful-hop {
+
+            0%,
+            100% {
+                transform: translateY(0) rotate(0deg);
+            }
+
+            30% {
+                transform: translateY(-20px) rotate(-10deg);
+            }
+
+            60% {
+                transform: translateY(-10px) rotate(10deg);
+            }
+        }
+
+        .playful-hop {
+            animation: playful-hop 0.7s cubic-bezier(.36, .07, .19, .97) infinite both;
+        }
+
+        @keyframes ghost-fade {
+            0% {
+                opacity: 1;
+                transform: translateY(0);
+            }
+
+            70% {
+                opacity: 0.7;
+                transform: translateY(10px);
+            }
+
+            100% {
+                opacity: 0.3;
+                transform: translateY(30px);
+            }
+        }
+
+        .ghost-fade {
+            animation: ghost-fade 1s ease-in-out infinite both;
+        }
+
+        #controlPanel {
+            box-shadow: 0 4px 24px 0 rgba(0, 0, 0, 0.08);
+        }
+    </style>
+</head>
+
+<body class="bg-gray-100 min-h-screen w-full h-full m-0 p-0 overflow-hidden">
+    <div id="controlPanel"
+        class="fixed top-4 left-4 z-20 flex flex-col items-start space-y-2 bg-white bg-opacity-30 backdrop-blur-md rounded-xl p-2 transition-opacity duration-300 opacity-60 hover:opacity-100">
+        <input id="targetNameInput" type="text" value="Winky"
+            class="px-3 py-2 rounded border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-400 mb-2"
+            placeholder="Enter target name...">
+        <button id="speakBtn"
+            class="w-full px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition">🚀</button>
+    </div>
+    <div id="gifContainer" class="w-full h-full flex items-center justify-center absolute top-0 left-0">
+        <!-- GIF will be rendered here -->
+    </div>
+    <script>
+        // Emote list: emoji, description, animation, and gif file
+        const emotes = [
+            { emoji: '😀', word: '開心', anim: 'happy-bounce', gif: 'happy.gif' },
+            { emoji: '😢', word: '喊喊', anim: 'sad-droop', gif: 'sad.gif' },
+            { emoji: '😡', word: '嬲嬲', anim: 'angry-shake', gif: 'angry.gif' },
+            { emoji: '🐰', word: 'XDXD', anim: 'playful-hop', gif: 'xdxd.gif' },
+            { emoji: '👻', word: '收工', anim: 'ghost-fade', gif: 'offwork.gif' },
+        ];
+
+        // Show the first emote by default
+        const gifContainer = document.getElementById('gifContainer');
+        function renderGif(e, animate = false) {
+            gifContainer.innerHTML = `
+                <div class="w-full h-full flex items-center justify-center relative">
+                    <img src="${e.gif}" alt="${e.word}" class="object-contain w-full h-full" style="max-width:100vw;max-height:100vh;" />
+                </div>
+            `;
+        }
+        let currentEmote = emotes[0];
+        renderGif(currentEmote);
+
+        // Button click handler
+        document.getElementById('speakBtn').addEventListener('click', () => {
+            // Cancel any ongoing speech
+            window.speechSynthesis.cancel();
+            currentEmote = emotes[Math.floor(Math.random() * emotes.length)];
+            renderGif(currentEmote, true);
+            const targetName = document.getElementById('targetNameInput').value || 'Winky';
+            const utter = new SpeechSynthesisUtterance(`${targetName} ${currentEmote.word}`);
+            utter.lang = "zh-HK";
+            window.speechSynthesis.speak(utter);
+        });
+    </script>
+</body>
+
+</html>
