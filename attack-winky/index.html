@@ -6,6 +6,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Voice Emote Button</title>
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link rel="prefetch" href="happy.gif" as="image">
+    <link rel="prefetch" href="sad.gif" as="image">
+    <link rel="prefetch" href="angry.gif" as="image">
+    <link rel="prefetch" href="xdxd.gif" as="image">
+    <link rel="prefetch" href="offwork.gif" as="image">
     <style>
         @keyframes happy-bounce {
 
@@ -130,6 +135,12 @@
             { emoji: '🐰', word: 'XDXD', anim: 'playful-hop', gif: 'xdxd.gif' },
             { emoji: '👻', word: '收工', anim: 'ghost-fade', gif: 'offwork.gif' },
         ];
+
+        // Prefetch all emote GIFs on page load
+        emotes.forEach(e => {
+            const img = new Image();
+            img.src = e.gif;
+        });
 
         // Show the first emote by default
         const gifContainer = document.getElementById('gifContainer');
