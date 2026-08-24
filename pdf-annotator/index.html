@@ -7,7 +7,7 @@
     <link rel="icon" href="data:," />
     <meta
       name="description"
-      content="Annotate PDFs in the browser: draw, text, arrows, rectangles, then export."
+      content="Annotate PDFs in the browser: draw, highlight, insert pages, then save."
     />
     <link rel="stylesheet" href="styles.css" />
   </head>
@@ -15,6 +15,10 @@
     <svg xmlns="http://www.w3.org/2000/svg" class="icons" aria-hidden="true">
       <symbol id="icon-open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
         <path d="M4 20h16a1 1 0 0 0 1-1V8.5a1 1 0 0 0-1-1h-6.2a1 1 0 0 1-.8-.4l-1.6-2.1a1 1 0 0 0-.8-.4H4a1 1 0 0 0-1 1V19a1 1 0 0 0 1 1z" />
+      </symbol>
+      <symbol id="icon-sample" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M7 3.5h7l5 5V20a1.5 1.5 0 0 1-1.5 1.5H7A1.5 1.5 0 0 1 5.5 20V5A1.5 1.5 0 0 1 7 3.5z" />
+        <path d="M14 3.5V9h5.5M8.5 13h7M8.5 17h5" />
       </symbol>
       <symbol id="icon-select" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
         <path d="M8 3v11l3.2-2.1L14 17.5l2.2-1.2-2.7-5.4L17 10.2 8 3z" />
@@ -88,7 +92,8 @@
             <span>Open</span>
           </button>
           <button type="button" class="btn" id="sample-btn" title="Load sample PDF">
-            Sample
+            <svg><use href="#icon-sample" /></svg>
+            <span>Load sample</span>
           </button>
           <input id="file-input" type="file" accept="application/pdf,.pdf" hidden />
         </div>
@@ -172,7 +177,7 @@
         </div>
 
         <div class="group" role="group" aria-label="Export">
-          <button type="button" class="btn" id="json-btn" title="View annotation JSON">
+          <button type="button" class="btn" id="json-btn" title="View or edit annotation JSON">
             <svg><use href="#icon-json" /></svg>
             <span>JSON</span>
           </button>
@@ -186,13 +191,14 @@
 
     <main class="viewer" id="viewer">
       <div id="empty-state" class="empty">
-        <p>Open a PDF to start annotating, drop a file here, or load the sample document.</p>
+        <p>Open a PDF to start annotating, drop a file here.</p>
         <div class="empty-actions">
           <button type="button" class="btn primary" id="empty-open">Open PDF</button>
           <button type="button" class="btn" id="empty-sample">Load sample</button>
+          <button type="button" class="btn" id="empty-blank">Blank page</button>
         </div>
-        <p id="error" class="error" hidden></p>
       </div>
+      <p id="error" class="error" hidden></p>
       <p id="loading" class="loading" hidden>Loading PDF…</p>
       <div id="pdf-container" class="pages" hidden></div>
     </main>
@@ -201,17 +207,31 @@
       <div class="dialog-head">
         <h2>Annotation JSON</h2>
         <div class="dialog-actions">
+          <button type="button" class="btn" id="apply-json">Apply</button>
           <button type="button" class="btn" id="copy-json">Copy</button>
           <button type="button" class="icon-btn" id="close-json" aria-label="Close">
             <svg><use href="#icon-close" /></svg>
           </button>
         </div>
       </div>
-      <pre id="json-output" class="json-output"></pre>
+      <label class="json-label" for="json-output">Edit JSON, then Apply. It is validated first; page count must match the open document.</label>
+      <textarea id="json-output" class="json-output" spellcheck="false"></textarea>
+      <p id="json-error" class="json-error" hidden></p>
     </dialog>
 
+    <!-- Classic scripts only: ES modules and Web Workers are blocked on file://. -->
     <script src="lib/fabric.min.js"></script>
-    <script src="lib/jspdf.umd.min.js"></script>
-    <script type="module" src="app.js"></script>
+    <script src="lib/pdf-lib.min.js"></script>
+    <script>
+      // PDF.js 6 expects the Iterator global; older browsers do not provide it.
+      if (typeof Iterator === "undefined") {
+        window.Iterator = { prototype: {} };
+      }
+    </script>
+    <script src="lib/pdf.worker.min.js"></script>
+    <script src="lib/pdf.min.js"></script>
+    <script src="annotation-json.js"></script>
+    <script src="annotator.js"></script>
+    <script src="app.js"></script>
   </body>
 </html>
