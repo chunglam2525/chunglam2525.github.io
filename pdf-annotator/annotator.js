@@ -1,7 +1,6 @@
-import * as pdfjsLib from 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.min.mjs';
+import * as pdfjsLib from './lib/pdf.min.mjs';
 
-pdfjsLib.GlobalWorkerOptions.workerSrc =
-  'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.worker.min.mjs';
+pdfjsLib.GlobalWorkerOptions.workerSrc = new URL('./lib/pdf.worker.min.mjs', import.meta.url).href;
 
 function getFabric() {
   const fabric = window.fabric;
@@ -17,17 +16,15 @@ function registerLineArrow(fabric) {
     return;
   }
 
-  fabric.LineArrow = fabric.util.createClass(fabric.Line, {
-    type: 'lineArrow',
+  class LineArrow extends fabric.Line {
+    static type = 'lineArrow';
 
-    initialize(element, options = {}) {
-      options.objectCaching = false;
-      this.callSuper('initialize', element, options);
-    },
+    constructor(points, options = {}) {
+      super(points, { objectCaching: false, ...options });
+    }
 
     _render(ctx) {
-      this.callSuper('_render', ctx);
-      // Axis-aligned lines have width or height 0 in Fabric. Still draw the head.
+      super._render(ctx);
       if (!this.visible) {
         return;
       }
@@ -49,12 +46,36 @@ function registerLineArrow(fabric) {
       ctx.fillStyle = this.stroke;
       ctx.fill();
       ctx.restore();
-    },
-  });
+    }
 
-  fabric.LineArrow.fromObject = function (object, callback) {
-    callback && callback(new fabric.LineArrow([object.x1, object.y1, object.x2, object.y2], object));
-  };
+    static fromObject(object) {
+      const { x1, y1, x2, y2, ...rest } = object;
+      return Promise.resolve(new this([x1, y1, x2, y2], rest));
+    }
+  }
+
+  fabric.LineArrow = LineArrow;
+  fabric.classRegistry.setClass(LineArrow);
+  fabric.classRegistry.setClass(LineArrow, 'lineArrow');
+}
+
+function pointerFromEvent(canvas, event) {
+  if (event?.scenePoint) {
+    return event.scenePoint;
+  }
+  if (typeof canvas.getScenePoint === 'function') {
+    return canvas.getScenePoint(event.e);
+  }
+  return canvas.getPointer(event.e);
+}
+
+function typeOf(object) {
+  return String(object?.type || '').toLowerCase().replace(/-/g, '');
+}
+
+function isType(object, ...names) {
+  const type = typeOf(object);
+  return names.some((name) => type === String(name).toLowerCase().replace(/-/g, ''));
 }
 
 function newId() {
@@ -114,17 +135,10 @@ async function fillTextLayer(page, container, viewport) {
 
 async function enliven(json) {
   const fabric = getFabric();
-  return new Promise((resolve, reject) => {
-    fabric.util.enlivenObjects([json], (objects) => {
-      const object = objects[0];
-      if (!object) {
-        reject(new Error('Could not restore annotation'));
-        return;
-      }
-      object.uuid = json.uuid;
-      resolve(object);
-    });
-  });
+  const Klass = fabric.classRegistry.getClass(json.type);
+  const object = await Klass.fromObject(json);
+  object.uuid = json.uuid;
+  return object;
 }
 
 export class PdfAnnotator {
@@ -197,10 +211,13 @@ export class PdfAnnotator {
       element.id = `page-${pageNumber}`;
       element.width = renderViewport.width;
       element.height = renderViewport.height;
-      await page.render({
-        canvasContext: element.getContext('2d'),
+      const context = element.getContext('2d');
+      const renderTask = page.render({
+        canvas: element,
+        canvasContext: context,
         viewport: renderViewport,
-      }).promise;
+      });
+      await (renderTask.promise ?? renderTask);
 
       const shell = document.createElement('div');
       shell.className = 'page-shell';
@@ -217,12 +234,15 @@ export class PdfAnnotator {
         selection: this.tool === 'select',
         preserveObjectStacking: true,
       });
+      canvas.freeDrawingBrush = new fabric.PencilBrush(canvas);
+      canvas.freeDrawingBrush.color = this.color;
+      canvas.freeDrawingBrush.width = this.brushSize;
       canvas.setDimensions({
         width: unscaled.width * this.scale,
         height: unscaled.height * this.scale,
       });
       canvas.setZoom(this.scale);
-      this.applyBackground(canvas, pageNumber - 1);
+      await this.applyBackground(canvas, pageNumber - 1);
       this.bindCanvas(canvas, pageNumber - 1);
       this.canvases.push(canvas);
 
@@ -296,7 +316,7 @@ export class PdfAnnotator {
         canvas.freeDrawingBrush.color = color;
       }
       const object = canvas.getActiveObject();
-      if (object && object.type !== 'image' && object.type !== 'activeSelection') {
+      if (object && !isType(object, 'image', 'activeSelection')) {
         this.recolor(object, color);
         canvas.requestRenderAll();
       }
@@ -316,7 +336,7 @@ export class PdfAnnotator {
     this.fontSize = Number(size) || 16;
     const canvas = this.activeCanvas();
     const object = canvas?.getActiveObject();
-    if (object && (object.type === 'i-text' || object.type === 'text')) {
+    if (object && isType(object, 'i-text', 'text')) {
       object.set('fontSize', this.fontSize);
       canvas.requestRenderAll();
     }
@@ -351,7 +371,7 @@ export class PdfAnnotator {
     if (!object) {
       return;
     }
-    if (object.type === 'activeSelection') {
+    if (isType(object, 'activeSelection')) {
       object.forEachObject((child) => canvas.remove(child));
       canvas.discardActiveObject();
     } else {
@@ -392,16 +412,17 @@ export class PdfAnnotator {
         return;
       }
       const reader = new FileReader();
-      reader.addEventListener('load', () => {
-        getFabric().Image.fromURL(reader.result, (image) => {
-          const maxWidth = (this.pageSizes[this.activePage]?.width || canvas.getWidth() / this.scale) * 0.5;
-          if (image.width > maxWidth) {
-            image.scaleToWidth(maxWidth);
-          }
-          canvas.add(image);
-          canvas.setActiveObject(image);
-          canvas.requestRenderAll();
-        });
+      reader.addEventListener('load', async () => {
+        const fabric = getFabric();
+        const image = await fabric.Image.fromURL(reader.result);
+        image.set({ originX: 'left', originY: 'top' });
+        const maxWidth = (this.pageSizes[this.activePage]?.width || canvas.getWidth() / this.scale) * 0.5;
+        if (image.width > maxWidth) {
+          image.scaleToWidth(maxWidth);
+        }
+        canvas.add(image);
+        canvas.setActiveObject(image);
+        canvas.requestRenderAll();
       });
       reader.readAsDataURL(file);
     });
@@ -415,7 +436,7 @@ export class PdfAnnotator {
         orientation: this.orientation,
       },
       pages: this.canvases.map((canvas) => {
-        const json = canvas.toJSON(['uuid']);
+        const json = canvas.toObject(['uuid']);
         json.backgroundImage = null;
         json.background = '';
         return json;
@@ -431,13 +452,10 @@ export class PdfAnnotator {
         if (!pages[index]) {
           return Promise.resolve();
         }
-        return new Promise((resolve) => {
-          canvas.loadFromJSON(pages[index], () => {
-            canvas.setZoom(this.scale);
-            this.applyBackground(canvas, index);
-            canvas.requestRenderAll();
-            resolve();
-          });
+        return canvas.loadFromJSON(pages[index]).then(async () => {
+          canvas.setZoom(this.scale);
+          await this.applyBackground(canvas, index);
+          canvas.requestRenderAll();
         });
       })
     );
@@ -581,6 +599,8 @@ export class PdfAnnotator {
       const object = new fabric.Rect({
         left: (rect.left - bounds.left) / this.scale,
         top: (rect.top - bounds.top) / this.scale,
+        originX: 'left',
+        originY: 'top',
         width: rect.width / this.scale,
         height: rect.height / this.scale,
         fill,
@@ -590,7 +610,7 @@ export class PdfAnnotator {
       });
       object.uuid = newId();
       canvas.add(object);
-      canvas.sendToBack(object);
+      canvas.sendObjectToBack(object);
       added.push(object);
     }
     this.ignoreHistory = false;
@@ -607,15 +627,19 @@ export class PdfAnnotator {
     }
   }
 
-  applyBackground(canvas, index) {
-    canvas.setBackgroundImage(
-      this.pageImages[index],
-      canvas.renderAll.bind(canvas),
-      {
-        scaleX: 1 / this.renderScale,
-        scaleY: 1 / this.renderScale,
-      }
-    );
+  async applyBackground(canvas, index) {
+    const fabric = getFabric();
+    const image = await fabric.Image.fromURL(this.pageImages[index]);
+    image.set({
+      originX: 'left',
+      originY: 'top',
+      scaleX: 1 / this.renderScale,
+      scaleY: 1 / this.renderScale,
+      selectable: false,
+      evented: false,
+    });
+    canvas.backgroundImage = image;
+    canvas.requestRenderAll();
   }
 
   bindCanvas(canvas, pageIndex) {
@@ -634,12 +658,14 @@ export class PdfAnnotator {
       return;
     }
 
-    const pointer = canvas.getPointer(event.e);
+    const pointer = pointerFromEvent(canvas, event);
 
     if (this.tool === 'text') {
       const text = new (getFabric().IText)('Text', {
         left: pointer.x,
         top: pointer.y,
+        originX: 'left',
+        originY: 'top',
         fill: this.color,
         fontSize: this.fontSize,
         selectable: true,
@@ -673,6 +699,8 @@ export class PdfAnnotator {
       const rect = new (getFabric().Rect)({
         left: pointer.x,
         top: pointer.y,
+        originX: 'left',
+        originY: 'top',
         width: 0,
         height: 0,
         fill: this.color,
@@ -690,7 +718,7 @@ export class PdfAnnotator {
       return;
     }
 
-    const pointer = canvas.getPointer(event.e);
+    const pointer = pointerFromEvent(canvas, event);
     const { object, kind, x, y } = this.draft;
 
     if (kind === 'arrow') {
@@ -853,12 +881,12 @@ export class PdfAnnotator {
   }
 
   recolor(object, color) {
-    if (object.type === 'i-text' || object.type === 'text' || object.type === 'rect') {
+    if (isType(object, 'i-text', 'text', 'rect')) {
       object.set('fill', color);
       return;
     }
     object.set('stroke', color);
-    if (object.type === 'lineArrow') {
+    if (isType(object, 'lineArrow')) {
       object.set('fill', color);
     }
   }

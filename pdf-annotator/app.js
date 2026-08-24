@@ -1,6 +1,6 @@
 import { PdfAnnotator } from './annotator.js';
 
-const SAMPLE_URL = 'https://mozilla.github.io/pdf.js/web/compressed.tracemonkey-pldi-09.pdf';
+const SAMPLE_URL = './lib/Joe_Yip_SoftwareEngineer_2026_0716.pdf';
 const ZOOM_STEPS = [0.5, 0.75, 1, 1.25, 1.5, 2];
 
 const viewer = document.getElementById('viewer');

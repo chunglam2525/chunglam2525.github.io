@@ -1,4 +1,4 @@
-import { compactDecrypt, decodeProtectedHeader } from "https://cdn.jsdelivr.net/npm/jose@6.0.12/+esm";
+import { compactDecrypt, decodeProtectedHeader } from "./lib/jose.esm.js";
 
 const secretInput = document.getElementById("secret");
 const tokenInput = document.getElementById("token");
