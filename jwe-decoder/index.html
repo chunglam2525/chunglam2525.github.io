@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>NextAuth JWE Decoder</title>
+    <meta
+      name="description"
+      content="Decode NextAuth v4 JWE session tokens entirely in your browser."
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="page">
+      <header class="header">
+        <div>
+          <h1>NextAuth JWE Decoder</h1>
+          <p class="lede">
+            Decrypt NextAuth v4 session tokens in your browser.
+          </p>
+        </div>
+      </header>
+
+      <p class="notice" role="note">
+        Decoding happens on this device. You can disconnect from the internet after
+        the page loads.
+      </p>
+
+      <main class="grid">
+        <section class="card" aria-labelledby="input-heading">
+          <h2 id="input-heading">Input</h2>
+          <p class="hint">Paste your NextAuth secret and the JWE from the session cookie.</p>
+
+          <label for="secret">NextAuth secret</label>
+          <input
+            id="secret"
+            name="secret"
+            type="password"
+            autocomplete="off"
+            spellcheck="false"
+            placeholder="NEXTAUTH_SECRET"
+          />
+
+          <label for="token">JWE session token</label>
+          <textarea
+            id="token"
+            name="token"
+            rows="8"
+            autocomplete="off"
+            spellcheck="false"
+            placeholder="eyJhbGciOiJkaXIiLCJlbmMiOiJBMjU2R0NNIn0.."
+          ></textarea>
+
+          <button id="decode" type="button">Decode token</button>
+          <p id="error" class="error" hidden></p>
+        </section>
+
+        <section class="card" aria-labelledby="output-heading">
+          <div class="card-head">
+            <div>
+              <h2 id="output-heading">Output</h2>
+              <p class="hint">Decoded JWT payload</p>
+            </div>
+            <button id="copy" type="button" class="secondary" hidden>Copy</button>
+          </div>
+          <p id="meta" class="meta" hidden></p>
+          <pre id="output" class="output empty">Decoded JSON will appear here.</pre>
+        </section>
+      </main>
+
+      <footer class="footer">
+        <p>
+          Supports NextAuth v4 <code>dir</code> / <code>A256GCMKW</code>.
+          Uses the same HKDF key derivation as NextAuth.
+        </p>
+      </footer>
+    </div>
+
+    <script type="module" src="app.js"></script>
+  </body>
+</html>
